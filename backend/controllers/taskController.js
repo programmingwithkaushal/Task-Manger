@@ -1,4 +1,6 @@
 const Task = require('../models/Task');
+const Project = require('../models/Project');
+const User = require('../models/User');
 
 /**
  * Task Assignment Logic:
@@ -228,7 +230,6 @@ exports.getDashboardStats = async (req, res) => {
       .limit(10);
 
     // Total system members count
-    const User = require('../models/User');
     const totalSystemMembers = await User.countDocuments();
 
     res.json({
