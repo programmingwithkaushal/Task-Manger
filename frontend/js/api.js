@@ -9,7 +9,7 @@
 const API_BASE = '/api';
 
 async function apiRequest(endpoint, options = {}) {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
 
   const config = {
     headers: {
@@ -34,8 +34,8 @@ async function apiRequest(endpoint, options = {}) {
 
   // If unauthorized, redirect to login
   if (response.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     window.location.href = '/pages/login.html';
     return;
   }
@@ -70,11 +70,11 @@ const api = {
 
 // Auth helpers
 function getToken() {
-  return localStorage.getItem('token');
+  return sessionStorage.getItem('token');
 }
 
 function getUser() {
-  const user = localStorage.getItem('user');
+  const user = sessionStorage.getItem('user');
   return user ? JSON.parse(user) : null;
 }
 
@@ -92,8 +92,8 @@ function requireAuth() {
 }
 
 function logout() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
   window.location.href = '/pages/login.html';
 }
 

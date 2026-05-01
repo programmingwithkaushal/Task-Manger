@@ -16,8 +16,8 @@ router.get('/dashboard/stats', auth, getDashboardStats);
 
 router.get('/', auth, getTasks);
 router.get('/:id', auth, getTask);
-router.post('/', auth, admin, createTask);
+router.post('/', auth, createTask);
 router.put('/:id', auth, updateTask);       // Member can update status
-router.delete('/:id', auth, admin, deleteTask);
+router.delete('/:id', auth, deleteTask);
 
 module.exports = router;

@@ -18,10 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   initSidebar('projects');
 
-  // Show/hide admin controls
-  if (!isAdmin()) {
-    document.getElementById('addProjectBtn')?.classList.add('hidden');
-  }
+  // All users can create projects
 
   await loadUsers();
   await loadProjects();
@@ -50,7 +47,13 @@ async function loadUsers() {
 
 async function loadProjects() {
   try {
-    allProjects = await api.get('/projects');
+    const projects = await api.get('/projects');
+    // For each project, fetch its tasks so they can be shown inline
+    const projectsWithTasks = await Promise.all(projects.map(async (p) => {
+      const tasks = await api.get(`/tasks?projectId=${p._id}`);
+      return { ...p, tasks };
+    }));
+    allProjects = projectsWithTasks;
     renderProjects(allProjects);
   } catch (err) {
     console.error('Failed to load projects:', err);
@@ -59,13 +62,14 @@ async function loadProjects() {
 
 function renderProjects(projects) {
   const container = document.getElementById('projectsGrid');
+  const user = getUser();
 
   if (!projects || projects.length === 0) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1/-1;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         <h3>No projects yet</h3>
-        <p>${isAdmin() ? 'Create your first project to get started.' : 'You haven\'t been added to any projects yet.'}</p>
+        <p>Create your first project to get started.</p>
       </div>
     `;
     return;
@@ -74,8 +78,10 @@ function renderProjects(projects) {
   container.innerHTML = projects.map(project => {
     const isExpired = new Date(project.deadline) < new Date();
     const memberCount = project.members?.length || 0;
+    const isOwner = project.createdBy?._id === user._id || project.createdBy === user._id;
+    
     return `
-      <div class="data-card">
+      <div class="data-card" id="project-${project._id}">
         <div class="data-card-header">
           <h3>${project.title}</h3>
           ${isExpired ? '<span class="badge badge-red">Overdue</span>' : '<span class="badge badge-green">Active</span>'}
@@ -85,15 +91,33 @@ function renderProjects(projects) {
           <span class="badge badge-purple">👥 ${memberCount} member${memberCount !== 1 ? 's' : ''}</span>
           <span class="badge badge-gray">📅 ${formatDate(project.deadline)}</span>
         </div>
-        <div class="data-card-meta">
-          <span style="font-size:.78rem;color:var(--text-muted);">Created by ${project.createdBy?.name || 'Unknown'}</span>
+        <div class="data-card-meta" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+          <span style="font-size:.78rem;color:var(--text-muted);">Owner: ${project.createdBy?.name || 'You'}</span>
         </div>
-        ${isAdmin() ? `
-          <div class="data-card-actions">
+
+        <div class="project-tasks-preview">
+          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; border-bottom: 1px solid var(--gray-100); padding-bottom: 0.25rem;">Tasks</h4>
+          ${project.tasks && project.tasks.length > 0 ? `
+            <ul style="list-style: none; padding: 0;">
+              ${project.tasks.map(t => `
+                <li style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                  <span>${t.title}</span>
+                  <span class="badge ${t.status === 'Completed' ? 'badge-green' : t.status === 'In Progress' ? 'badge-blue' : 'badge-gray'}" style="font-size: 0.65rem;">${t.status}</span>
+                </li>
+              `).join('')}
+            </ul>
+          ` : '<p style="font-size: 0.75rem; color: var(--text-muted);">No tasks yet.</p>'}
+        </div>
+
+        <div class="data-card-actions">
+          ${isOwner ? `
+            <button class="btn btn-sm btn-primary" onclick="window.location.href='/pages/tasks.html?projectId=${project._id}'">Add Task</button>
             <button class="btn btn-sm btn-secondary" onclick="openProjectModal('${project._id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteProject('${project._id}')">Delete</button>
-          </div>
-        ` : ''}
+          ` : `
+            <button class="btn btn-sm btn-secondary" onclick="window.location.href='/pages/tasks.html?projectId=${project._id}'">View My Tasks</button>
+          `}
+        </div>
       </div>
     `;
   }).join('');

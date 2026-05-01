@@ -12,7 +12,7 @@ const Task = require('../models/Task');
  * - Dashboard queries filter by this condition for the overdue count
  */
 
-// @desc    Get tasks (Admin sees all, Member sees own)
+// @desc    Get tasks
 // @route   GET /api/tasks
 // @access  Private
 exports.getTasks = async (req, res) => {
@@ -20,14 +20,27 @@ exports.getTasks = async (req, res) => {
     const { projectId, status, priority, assignedTo } = req.query;
     let filter = {};
 
-    if (projectId) filter.projectId = projectId;
-    if (status) filter.status = status;
-    if (priority) filter.priority = priority;
-
-    if (req.user.role === 'Admin') {
-      if (assignedTo) filter.assignedTo = assignedTo;
+    if (projectId) {
+      filter.projectId = projectId;
+      // If filtering by project, ensure user has access to that project
+      const project = await Project.findById(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found.' });
+      
+      const isOwner = project.createdBy.toString() === req.user._id.toString();
+      const isMember = project.members.some(m => m.toString() === req.user._id.toString());
+      
+      if (!isOwner && !isMember) {
+        return res.status(403).json({ message: 'Access denied to this project.' });
+      }
+      
+      // If member, only show their tasks unless they are the owner
+      if (!isOwner) {
+        filter.assignedTo = req.user._id;
+      } else if (assignedTo) {
+        filter.assignedTo = assignedTo;
+      }
     } else {
-      // Members only see tasks assigned to them
+      // No project filter: Members only see tasks assigned to them
       filter.assignedTo = req.user._id;
     }
 
@@ -49,14 +62,16 @@ exports.getTask = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('assignedTo', 'name email')
-      .populate('projectId', 'title');
+      .populate('projectId', 'title createdBy');
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found.' });
     }
 
-    // Members can only view their own tasks
-    if (req.user.role !== 'Admin' && task.assignedTo?._id.toString() !== req.user._id.toString()) {
+    const isProjectOwner = task.projectId.createdBy.toString() === req.user._id.toString();
+    const isAssigned = task.assignedTo?._id.toString() === req.user._id.toString();
+
+    if (!isProjectOwner && !isAssigned) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
@@ -68,10 +83,18 @@ exports.getTask = async (req, res) => {
 
 // @desc    Create task
 // @route   POST /api/tasks
-// @access  Admin only
+// @access  Private
 exports.createTask = async (req, res) => {
   try {
     const { title, description, assignedTo, projectId, priority, status, dueDate } = req.body;
+
+    // Check project ownership
+    const project = await Project.findById(projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found.' });
+
+    if (project.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied. Only the project creator can add tasks.' });
+    }
 
     const task = await Task.create({
       title,
@@ -93,21 +116,22 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// @desc    Update task (Admin: full edit, Member: status only)
+// @desc    Update task
 // @route   PUT /api/tasks/:id
 // @access  Private
 exports.updateTask = async (req, res) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const task = await Task.findById(req.params.id).populate('projectId');
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found.' });
     }
 
+    const isProjectOwner = task.projectId.createdBy.toString() === req.user._id.toString();
     let updateData;
 
-    if (req.user.role === 'Admin') {
-      // Admin can update everything
+    if (isProjectOwner) {
+      // Owner can update everything
       const { title, description, assignedTo, projectId, priority, status, dueDate } = req.body;
       updateData = { title, description, assignedTo, projectId, priority, status, dueDate };
     } else {
@@ -121,17 +145,11 @@ exports.updateTask = async (req, res) => {
         return res.status(400).json({ message: 'Status is required.' });
       }
 
-      /**
-       * Status Flow Logic:
-       * - Pending -> In Progress (Accepting)
-       * - In Progress -> Completed (Finishing)
-       * - Reverting back is NOT allowed for members
-       */
       const currentStatus = task.status;
       const validTransitions = {
         'Pending': ['In Progress'],
         'In Progress': ['Completed'],
-        'Completed': [] // Final state
+        'Completed': []
       };
 
       if (!validTransitions[currentStatus].includes(newStatus)) {
@@ -158,15 +176,18 @@ exports.updateTask = async (req, res) => {
 
 // @desc    Delete task
 // @route   DELETE /api/tasks/:id
-// @access  Admin only
+// @access  Private
 exports.deleteTask = async (req, res) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
+    const task = await Task.findById(req.params.id).populate('projectId');
+    if (!task) return res.status(404).json({ message: 'Task not found.' });
 
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found.' });
+    // Only project owner can delete
+    if (task.projectId.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied. Only the project creator can delete tasks.' });
     }
 
+    await Task.findByIdAndDelete(req.params.id);
     res.json({ message: 'Task deleted successfully.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -178,31 +199,37 @@ exports.deleteTask = async (req, res) => {
 // @access  Private
 exports.getDashboardStats = async (req, res) => {
   try {
-    /**
-     * Dashboard Logic:
-     * - Admin sees stats for ALL tasks across all projects
-     * - Member sees stats only for tasks assigned to them
-     * - Overdue = status !== 'Completed' && dueDate < now
-     */
     const now = new Date();
-    let filter = {};
+    
+    // Find all projects where user is owner
+    const ownedProjects = await Project.find({ createdBy: req.user._id });
+    const ownedProjectIds = ownedProjects.map(p => p._id);
 
-    if (req.user.role !== 'Admin') {
-      filter.assignedTo = req.user._id;
-    }
+    // Dashboard Logic:
+    // - Show aggregate stats for ALL tasks in projects OWNED by user
+    // - PLUS tasks assigned to user in other projects
+    const allTasks = await Task.find({
+      $or: [
+        { projectId: { $in: ownedProjectIds } },
+        { assignedTo: req.user._id }
+      ]
+    });
 
-    const allTasks = await Task.find(filter);
     const totalTasks = allTasks.length;
     const completedTasks = allTasks.filter(t => t.status === 'Completed').length;
     const pendingTasks = allTasks.filter(t => t.status === 'Pending').length;
     const inProgressTasks = allTasks.filter(t => t.status === 'In Progress').length;
     const overdueTasks = allTasks.filter(t => t.status !== 'Completed' && new Date(t.dueDate) < now).length;
 
-    // Tasks assigned to the logged-in user (always filtered by current user)
+    // My Tasks section (assigned to me)
     const myTasks = await Task.find({ assignedTo: req.user._id })
       .populate('projectId', 'title')
       .sort({ dueDate: 1 })
       .limit(10);
+
+    // Total system members count
+    const User = require('../models/User');
+    const totalSystemMembers = await User.countDocuments();
 
     res.json({
       totalTasks,
@@ -210,7 +237,8 @@ exports.getDashboardStats = async (req, res) => {
       pendingTasks,
       inProgressTasks,
       overdueTasks,
-      myTasks
+      myTasks,
+      totalSystemMembers
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

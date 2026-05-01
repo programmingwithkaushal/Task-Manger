@@ -23,10 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   initSidebar('tasks');
 
-  // Show/hide admin controls
-  if (!isAdmin()) {
-    document.getElementById('addTaskBtn')?.classList.add('hidden');
-  }
+  // Admin controls are now project-based (handled in loadProjectsList)
 
   await Promise.all([loadUsers(), loadProjectsList()]);
   await loadTasks();
@@ -60,12 +57,39 @@ async function loadUsers() {
 
 async function loadProjectsList() {
   try {
-    allProjects = await api.get('/projects');
-    // Populate project filter
+    const projects = await api.get('/projects');
+    const user = getUser();
+    allProjects = projects;
+    
+    // Only projects where user is owner can have tasks added by them
+    const ownedProjects = projects.filter(p => (p.createdBy?._id || p.createdBy) === user._id);
+    
+    // Populate project filter (all projects user has access to)
     const filterProject = document.getElementById('filterProject');
     if (filterProject) {
       filterProject.innerHTML = '<option value="">All Projects</option>' +
-        allProjects.map(p => `<option value="${p._id}">${p.title}</option>`).join('');
+        projects.map(p => `<option value="${p._id}">${p.title}</option>`).join('');
+    }
+
+    // Populate project dropdown in modal (only owned projects)
+    const projectSelect = document.getElementById('taskProject');
+    if (projectSelect) {
+      projectSelect.innerHTML = '<option value="">Select project...</option>' +
+        ownedProjects.map(p => `<option value="${p._id}">${p.title}</option>`).join('');
+    }
+
+    // Show add button if user owns any project
+    if (ownedProjects.length > 0) {
+      document.getElementById('addTaskBtn')?.classList.remove('hidden');
+    } else {
+      document.getElementById('addTaskBtn')?.classList.add('hidden');
+    }
+
+    // If projectId in URL, auto-select it and open modal
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlProjectId = urlParams.get('projectId');
+    if (urlProjectId && ownedProjects.some(p => p._id === urlProjectId)) {
+      openTaskModal(null, urlProjectId);
     }
   } catch (err) {
     console.error('Failed to load projects:', err);
@@ -74,7 +98,11 @@ async function loadProjectsList() {
 
 async function loadTasks() {
   try {
-    allTasks = await api.get('/tasks');
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('projectId');
+    const endpoint = projectId ? `/tasks?projectId=${projectId}` : '/tasks';
+    
+    allTasks = await api.get(endpoint);
     renderTasks(allTasks);
   } catch (err) {
     console.error('Failed to load tasks:', err);
@@ -96,14 +124,14 @@ function applyFilters() {
 
 function renderTasks(tasks) {
   const container = document.getElementById('tasksGrid');
-  const admin = isAdmin();
+  const user = getUser();
 
   if (!tasks || tasks.length === 0) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1/-1;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <h3>No tasks found</h3>
-        <p>${admin ? 'Create your first task to get started.' : 'No tasks assigned to you yet.'}</p>
+        <p>Tasks assigned to you or in your projects will appear here.</p>
       </div>
     `;
     return;
@@ -113,6 +141,9 @@ function renderTasks(tasks) {
     const isOverdue = task.status !== 'Completed' && new Date(task.dueDate) < new Date();
     const statusClass = task.status === 'Completed' ? 'status-completed' : task.status === 'In Progress' ? 'status-in-progress' : 'status-pending';
     const priorityClass = task.priority === 'High' ? 'priority-high' : task.priority === 'Medium' ? 'priority-medium' : 'priority-low';
+
+    // Owner of the project this task belongs to
+    const isOwner = (task.projectId?.createdBy?._id || task.projectId?.createdBy) === user._id;
 
     return `
       <div class="data-card" style="${isOverdue ? 'border-left: 3px solid var(--danger-500);' : ''}">
@@ -133,7 +164,7 @@ function renderTasks(tasks) {
           <span style="font-size:.78rem;color:var(--text-muted);">👤 ${task.assignedTo?.name || 'Unassigned'}</span>
         </div>
         <div class="data-card-actions">
-          ${admin ? `
+          ${isOwner ? `
             <button class="btn btn-sm btn-secondary" onclick="openTaskModal('${task._id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteTask('${task._id}')">Delete</button>
           ` : `
@@ -151,7 +182,7 @@ function renderTasks(tasks) {
   }).join('');
 }
 
-function openTaskModal(taskId = null) {
+function openTaskModal(taskId = null, urlProjectId = null) {
   const modal = document.getElementById('taskModalOverlay');
   const title = document.getElementById('taskModalTitle');
   const form = document.getElementById('taskForm');
@@ -160,10 +191,18 @@ function openTaskModal(taskId = null) {
   form.reset();
   idInput.value = '';
 
-  // Populate project dropdown
+  // Populate project dropdown (only owned projects)
+  const user = getUser();
+  const ownedProjects = allProjects.filter(p => (p.createdBy?._id || p.createdBy) === user._id);
+  
   const projectSelect = document.getElementById('taskProject');
   projectSelect.innerHTML = '<option value="">Select project...</option>' +
-    allProjects.map(p => `<option value="${p._id}">${p.title}</option>`).join('');
+    ownedProjects.map(p => `<option value="${p._id}">${p.title}</option>`).join('');
+
+  // Pre-select project if passed
+  if (urlProjectId) {
+    projectSelect.value = urlProjectId;
+  }
 
   // Populate assignedTo dropdown
   const assignSelect = document.getElementById('taskAssignedTo');

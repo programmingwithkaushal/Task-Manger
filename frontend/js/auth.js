@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const data = await api.post('/auth/login', { email, password });
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
         window.location.href = '/pages/dashboard.html';
       } catch (err) {
         showAlert('authAlert', err.message);
@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
-      const role = document.getElementById('role').value;
 
       if (password.length < 6) {
         showAlert('authAlert', 'Password must be at least 6 characters.');
@@ -53,9 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       try {
-        const data = await api.post('/auth/signup', { name, email, password, role });
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        const data = await api.post('/auth/signup', { name, email, password });
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
         window.location.href = '/pages/dashboard.html';
       } catch (err) {
         showAlert('authAlert', err.message);

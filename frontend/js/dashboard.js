@@ -28,6 +28,7 @@ async function loadDashboard() {
     document.getElementById('pendingTasks').textContent = stats.pendingTasks;
     document.getElementById('overdueTasks').textContent = stats.overdueTasks;
     document.getElementById('inProgressTasks').textContent = stats.inProgressTasks;
+    document.getElementById('totalMembers').textContent = stats.totalSystemMembers || '0';
 
     renderMyTasks(stats.myTasks);
   } catch (err) {

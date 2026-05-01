@@ -12,8 +12,8 @@ const admin = require('../middleware/admin');
 
 router.get('/', auth, getProjects);
 router.get('/:id', auth, getProject);
-router.post('/', auth, admin, createProject);
-router.put('/:id', auth, admin, updateProject);
-router.delete('/:id', auth, admin, deleteProject);
+router.post('/', auth, createProject);
+router.put('/:id', auth, updateProject);
+router.delete('/:id', auth, deleteProject);
 
 module.exports = router;
