@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TaskFlow Profile — View your account details">
+  <title>Profile — TaskFlow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Profile</h1>
+          <p>Your account details.</p>
+        </div>
+      </div>
+
+      <div class="card profile-card">
+        <div class="card-body">
+          <div class="profile-avatar" id="profileAvatar">?</div>
+          <div class="profile-info">
+            <div class="info-row">
+              <span class="label">Name</span>
+              <span class="value" id="profileName">—</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Email</span>
+              <span class="value" id="profileEmail">—</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Role</span>
+              <span class="value" id="profileRole">—</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Joined</span>
+              <span class="value" id="profileJoined">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>

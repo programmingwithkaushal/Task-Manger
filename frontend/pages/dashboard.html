@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TaskFlow Dashboard — Overview of tasks, projects, and team performance">
+  <title>Dashboard — TaskFlow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Welcome back, <span id="welcomeName"></span> 👋</h1>
+          <p>Here's what's happening with your tasks today.</p>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue">📋</div>
+          <div class="stat-info">
+            <h3 id="totalTasks">0</h3>
+            <p>Total Tasks</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">✅</div>
+          <div class="stat-info">
+            <h3 id="completedTasks">0</h3>
+            <p>Completed</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon yellow">⏳</div>
+          <div class="stat-info">
+            <h3 id="pendingTasks">0</h3>
+            <p>Pending</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">🔄</div>
+          <div class="stat-info">
+            <h3 id="inProgressTasks">0</h3>
+            <p>In Progress</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">⚠️</div>
+          <div class="stat-info">
+            <h3 id="overdueTasks">0</h3>
+            <p>Overdue</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Tasks -->
+      <div class="card">
+        <div class="card-header">
+          <h2>My Tasks</h2>
+        </div>
+        <div class="card-body" id="myTasksList">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>
