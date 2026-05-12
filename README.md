@@ -49,7 +49,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The app will be available at `http://localhost:5000`
+The app will be available at `web-production-4a575.up.railway.app`
 
 ## Environment Variables
 
