@@ -10,7 +10,7 @@ A full-stack Team Task Manager application with role-based access control, proje
 | Backend        | Node.js + Express.js           |
 | Database       | MongoDB + Mongoose             |
 | Authentication | JWT + bcrypt                   |
-| Deployment     | Railway-ready                  |
+| Deployment     | Railway             |
 
 ## Features
 
